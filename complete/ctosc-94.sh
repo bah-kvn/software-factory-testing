@@ -3,7 +3,6 @@ export AMI="ami-08b68a787bb9cf0f3"      # CIS RHEL 7 STIG AMI
 export BASE=$PWD
 export PROJECT="$(basename -s '.sh' $(readlink -f $0))"
 export ACCOUNT=$(echo $AWS_DEFAULT_PROFILE | cut -d '-' -f2)
-
 export SOURCE_BRANCH="$PROJECT"
 export DEST=$HOME/factory/$PROJECT #change this to the directory the code to live
 export ARTIFACTS=$HOME/factory/artifacts #change this to the directory the code to live
@@ -13,7 +12,7 @@ export PUBLIC_KEY="$( cat $AGE_KEY_FILE | grep public | cut -d ' ' -f4 )"
 export PRIVATE_KEY="$( cat $AGE_KEY_FILE | grep -v "^#" )"
 export SOPS_AGE_KEY="$PRIVATE_KEY"
 echo "Project = $PROJECT  |  $DOMAIN"
-echo """ skipped
+echo """skipping
 git clone https://github.com/boozallen/software-factory $DEST-source
 cd $DEST-source
 git checkout -b $PROJECT
@@ -42,6 +41,7 @@ copier \
   -d assume_role="arn:aws:iam::$ACCOUNT:role/TerraformDeployer" \
   -d cert=false \
   -d perm_boundaries=true \
+  -d perm_boundary_needed=true \
   -d email="dev@bah.com" \
   -d hosted_zone_id="Z05620741ABABDDEC0B4Z" \
   -d iam_users_perm_boundary="arn:aws:iam::$ACCOUNT:policy/BAH_User_Policy_Boundary" \
@@ -49,7 +49,12 @@ copier \
   -r "$SOURCE_BRANCH" \
   gh:boozallen/software-factory $DEST
 
+
 cd $DEST
+"""
+export PROJECT="$PROJECT-test"
+export DEST="$DEST-test"
+echo """skipping
 git init
 git remote add origin https://github.com/boozallen/software-factory-testing.git
 git checkout -b $PROJECT
@@ -57,11 +62,11 @@ git add . --all
 git commit -a -m' rendered_template '
 git push --set-upstream origin $PROJECT --force
 
+"""
 git clone https://github.com/boozallen/software-factory-testing.git $DEST
 cd $DEST && git checkout $PROJECT
 
-#cd $DEST && git init && terragrunt run-all apply --terragrunt-non-interactive | tee /tmp/$PROJECT-apply.log
-"""
+
 cd $DEST && terragrunt run-all apply --terragrunt-non-interactive | tee /tmp/$PROJECT-apply.log
 export KUBECONFIG=$( readlink -f $(find $DEST/cluster/infra -name "rke2-$PROJECT*.yaml") )
 export KEY=$( readlink -f $(find $DEST -name "*.pem" ) )

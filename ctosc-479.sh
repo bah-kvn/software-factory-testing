@@ -3,7 +3,6 @@ export AMI="ami-08b68a787bb9cf0f3"      # CIS RHEL 7 STIG AMI
 export BASE=$PWD
 export PROJECT="$(basename -s '.sh' $(readlink -f $0))"
 export ACCOUNT=$(echo $AWS_DEFAULT_PROFILE | cut -d '-' -f2)
-
 export SOURCE_BRANCH="$PROJECT"
 export DEST=$HOME/factory/$PROJECT #change this to the directory the code to live
 export ARTIFACTS=$HOME/factory/artifacts #change this to the directory the code to live
@@ -12,14 +11,15 @@ export AGE_KEY_FILE="$HOME/.ssh/default.age" #file is read to get the AGE public
 export PUBLIC_KEY="$( cat $AGE_KEY_FILE | grep public | cut -d ' ' -f4 )"
 export PRIVATE_KEY="$( cat $AGE_KEY_FILE | grep -v "^#" )"
 export SOPS_AGE_KEY="$PRIVATE_KEY"
-echo "Project = $PROJECT  |  $DOMAIN"
-echo """ skipped
-git clone https://github.com/boozallen/software-factory $DEST-source
-cd $DEST-source
-git checkout -b $PROJECT
-git add . --all
-git commit -a -m' updates before rendering '
-git push --set-upstream origin $PROJECT --force
+echo "Project = $PROJECT  |  $DOMAIN | $DEST"
+
+#git clone https://github.com/boozallen/software-factory $DEST-source
+#cd $DEST-source
+#git checkout -b $PROJECT
+#git add . --all
+#git commit -a -m' updates before rendering '
+#git push --set-upstream origin $PROJECT --force
+#exit
 
 copier \
   -d age_key_file="$AGE_KEY_FILE" \
@@ -29,6 +29,7 @@ copier \
   -d aws_ami="$AMI" \
   -d blueprint="rke-single-cluster" \
   -d byo_cert=false \
+  -d consumers_whitlisted_cidrs="128.229.4.0/24,156.80.4.0/24,128.229.67.0/24"
   -d project_name="$PROJECT" \
   -d domain="$DOMAIN" \
   -d ib_user="$REGISTRY1_SA_USERNAME" \
@@ -47,8 +48,9 @@ copier \
   -d iam_users_perm_boundary="arn:aws:iam::$ACCOUNT:policy/BAH_User_Policy_Boundary" \
   --overwrite \
   -r "$SOURCE_BRANCH" \
-  gh:boozallen/software-factory $DEST
+  gh:boozallen/software-factory $DEST-rendered
 
+exit
 cd $DEST
 git init
 git remote add origin https://github.com/boozallen/software-factory-testing.git

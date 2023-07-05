@@ -1,26 +1,25 @@
 #!/bin/bash -e
 export AMI="ami-08b68a787bb9cf0f3"      # CIS RHEL 7 STIG AMI
 export BASE=$PWD
-export PROJECT="$(basename -s '.sh' $(readlink -f $0))"
+export PROJECT="ctosc-94-prsf73"
 export ACCOUNT=$(echo $AWS_DEFAULT_PROFILE | cut -d '-' -f2)
-
-export SOURCE_BRANCH="$PROJECT"
+echo "Project = $PROJECT"
 export DEST=$HOME/factory/$PROJECT #change this to the directory the code to live
 export ARTIFACTS=$HOME/factory/artifacts #change this to the directory the code to live
-export DOMAIN="$PROJECT.bsf-testing.com"
+export DOMAIN="bsf-testing.com"
 export AGE_KEY_FILE="$HOME/.ssh/default.age" #file is read to get the AGE public and private keys
 export PUBLIC_KEY="$( cat $AGE_KEY_FILE | grep public | cut -d ' ' -f4 )"
 export PRIVATE_KEY="$( cat $AGE_KEY_FILE | grep -v "^#" )"
 export SOPS_AGE_KEY="$PRIVATE_KEY"
-echo "Project = $PROJECT  |  $DOMAIN"
-echo """ skipped
+
+#clone main then make a branch for your changes
 git clone https://github.com/boozallen/software-factory $DEST-source
 cd $DEST-source
 git checkout -b $PROJECT
 git add . --all
-git commit -a -m' updates before rendering '
 git push --set-upstream origin $PROJECT --force
 
+#render the template from your branch
 copier \
   -d age_key_file="$AGE_KEY_FILE" \
   -d age_secret_key="$PRIVATE_KEY" \
@@ -42,13 +41,15 @@ copier \
   -d assume_role="arn:aws:iam::$ACCOUNT:role/TerraformDeployer" \
   -d cert=false \
   -d perm_boundaries=true \
+  -d perm_boundary_needed=true \
   -d email="dev@bah.com" \
   -d hosted_zone_id="Z05620741ABABDDEC0B4Z" \
   -d iam_users_perm_boundary="arn:aws:iam::$ACCOUNT:policy/BAH_User_Policy_Boundary" \
   --overwrite \
-  -r "$SOURCE_BRANCH" \
+  -r "$PROJECT" \
   gh:boozallen/software-factory $DEST
 
+#push rendered template to software-factory-testing
 cd $DEST
 git init
 git remote add origin https://github.com/boozallen/software-factory-testing.git
@@ -57,18 +58,13 @@ git add . --all
 git commit -a -m' rendered_template '
 git push --set-upstream origin $PROJECT --force
 
-git clone https://github.com/boozallen/software-factory-testing.git $DEST
-cd $DEST && git checkout $PROJECT
-
-#cd $DEST && git init && terragrunt run-all apply --terragrunt-non-interactive | tee /tmp/$PROJECT-apply.log
-"""
-cd $DEST && terragrunt run-all apply --terragrunt-non-interactive | tee /tmp/$PROJECT-apply.log
-export KUBECONFIG=$( readlink -f $(find $DEST/cluster/infra -name "rke2-$PROJECT*.yaml") )
+#deploy rendered template
+cd $DEST
+git init && terragrunt run-all apply --terragrunt-non-interactive | tee /tmp/$PROJECT-apply.log
+export KUBECONFIG=$(find $DEST/cluster/infra -name "rke2-$PROJECT*.yaml")
 export KEY=$( readlink -f $(find $DEST -name "*.pem" ) )
-kubectl get nodes | tee /tmp/$PROJECT-nodes.log
+kubectl get nodes | tee /tmp/$PROJECT.nodes
 echo "export KUBECONFIG=$KUBECONFIG" > /tmp/$PROJECT.env
 echo "export KEY=$KEY" >> /tmp/$PROJECT.env
-kubectl get gitrepositories,kustomizations,hr,po -A | tee /tmp/$PROJECT.log
-kubectl get -n bigbang helmrelease.helm.toolkit.fluxcd.io/neuvector -o yaml | tee -a /tmp/$PROJECT.log
+kubectl get gitrepositories,kustomizations,hr,po -A | tee $PROJECT.flux
 tar --exclude ".terraform" --exclude-vcs --no-mac-metadata -cvzf $ARTIFACTS/$PROJECT-"$(date +%Y-%m-%d_%H-%M-%S)".tgz $DEST /tmp/$PROJECT*
-

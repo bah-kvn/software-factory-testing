@@ -48,7 +48,7 @@ copier \
   -d iam_users_perm_boundary="arn:aws:iam::$ACCOUNT:policy/BAH_User_Policy_Boundary" \
   --overwrite \
   -r "$SOURCE_BRANCH" \
-  gh:boozallen/software-factory $DEST-rendered
+  gh:boozallen/software-factory $DEST
 
 exit
 cd $DEST

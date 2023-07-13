@@ -1,7 +1,7 @@
 #!/bin/bash -e
 export AMI="ami-08b68a787bb9cf0f3"      # CIS RHEL 7 STIG AMI
 export BASE=$PWD
-export PROJECT="test-ccm"
+export PROJECT="test-app"
 export ACCOUNT=$(echo $AWS_DEFAULT_PROFILE | cut -d '-' -f2)
 
 export SOURCE_BRANCH="$PROJECT"
@@ -13,12 +13,12 @@ export PUBLIC_KEY="$( cat $AGE_KEY_FILE | grep public | cut -d ' ' -f4 )"
 export PRIVATE_KEY="$( cat $AGE_KEY_FILE | grep -v "^#" )"
 export SOPS_AGE_KEY="$PRIVATE_KEY"
 echo "Project = $PROJECT  |  $DOMAIN"
-rm -rf $DEST-source
+echo """skipping
 git clone https://github.com/boozallen/software-factory $DEST-source
 cd $DEST-source
-
-
-
+git checkout -b $PROJECT
+git add . --all
+git commit -a -m' updates before rendering '
 git push --set-upstream origin $PROJECT --force
 
 copier \
@@ -51,13 +51,22 @@ copier \
 
 cd $DEST
 git init
-git checkout -b $PROJECT
 git remote add origin https://github.com/boozallen/software-factory-testing.git
+git checkout -b $PROJECT
+yq e ".kyverno.enabled = false" -i $DEST/cluster/add-ons/bigbang/values.yaml
+yq e ".kiali.enabled = false" -i $DEST/cluster/add-ons/bigbang/values.yaml
+yq e ".kyvernoPolicies.enabled = false" -i $DEST/cluster/add-ons/bigbang/values.yaml
+yq e ".neuvector.enabled = false" -i $DEST/cluster/add-ons/bigbang/values.yaml
+yq e ".tempo.enabled = false" -i $DEST/cluster/add-ons/bigbang/values.yaml
+yq e ".domain = strenv(DOMAIN)" -i $DEST/cluster/add-ons/bigbang/values.yaml
+yq e ".global.domain = strenv(DOMAIN)" -i $DEST/config.yaml
+yq e ".global.email = strenv(EMAIL)" -i $DEST/config.yaml
+yq e ".global.aws.hosted_zone_id = \"Z05620741ABABDDEC0B4Z\"" -i $DEST/config.yaml
+yq e ".global.aws.iam_users_perm_boundary = \"arn:aws:iam::721762329763:policy/BAH_User_Policy_Boundary\"" -i $DEST/config.yaml
 git add . --all
 git commit -a -m' rendered_template '
 git push --set-upstream origin $PROJECT --force
-
-
+"""
 cd $DEST && terragrunt run-all apply --terragrunt-non-interactive | tee /tmp/$PROJECT-apply.log
 export KUBECONFIG=$( readlink -f $(find $DEST/cluster/infra -name "rke2-$PROJECT*.yaml") )
 export KEY=$( readlink -f $(find $DEST -name "*.pem" ) )

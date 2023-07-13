@@ -1,7 +1,7 @@
 #!/bin/bash -e
 export AMI="ami-08b68a787bb9cf0f3"      # CIS RHEL 7 STIG AMI
 export BASE=$PWD
-export PROJECT="ctosc-94-prsf73"
+export PROJECT="ctosc-97-pr"
 export ACCOUNT=$(echo $AWS_DEFAULT_PROFILE | cut -d '-' -f2)
 echo "Project = $PROJECT"
 export DEST=$HOME/factory/$PROJECT #change this to the directory the code to live
@@ -13,8 +13,11 @@ export PRIVATE_KEY="$( cat $AGE_KEY_FILE | grep -v "^#" )"
 export SOPS_AGE_KEY="$PRIVATE_KEY"
 
 #clone main then make a branch for your changes
+echo """skipped
+rm -rf $DEST-source
 git clone https://github.com/boozallen/software-factory $DEST-source
 cd $DEST-source
+gh pr checkout 90
 git checkout -b $PROJECT
 git add . --all
 git push --set-upstream origin $PROJECT --force
@@ -59,8 +62,10 @@ git commit -a -m' rendered_template '
 git push --set-upstream origin $PROJECT --force
 
 #deploy rendered template
+"""
 cd $DEST
-git init && terragrunt run-all apply --terragrunt-non-interactive | tee /tmp/$PROJECT-apply.log
+#git init
+terragrunt run-all apply --terragrunt-non-interactive | tee /tmp/$PROJECT-apply.log
 export KUBECONFIG=$(find $DEST/cluster/infra -name "rke2-$PROJECT*.yaml")
 export KEY=$( readlink -f $(find $DEST -name "*.pem" ) )
 kubectl get nodes | tee /tmp/$PROJECT.nodes

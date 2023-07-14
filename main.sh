@@ -49,10 +49,12 @@ yq e ".kyvernoPolicies.enabled = false" -i $DEST/cluster/add-ons/bigbang/values.
 yq e ".neuvector.enabled = false" -i $DEST/cluster/add-ons/bigbang/values.yaml
 yq e ".tempo.enabled = false" -i $DEST/cluster/add-ons/bigbang/values.yaml
 yq e ".domain = strenv(DOMAIN)" -i $DEST/cluster/add-ons/bigbang/values.yaml
+sed -i '' "s/0.2.8/0.2.7/g" $DEST/cluster/infra/terragrunt.hcl
 #push rendered template to software-factory-testing
+
 cd $DEST
 git init
-git remote rm origin
+git remote rm origin || true
 git remote add origin https://github.com/boozallen/software-factory-testing.git
 git checkout -b $PROJECT || true
 git add . --all
